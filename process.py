@@ -11,20 +11,20 @@ class Process:
         self.pid = pid
         self.arrival_time = arrival_time
         self.bursts = bursts
-        self.type = process_type
+        self.type = "CPU-bound" if process_type else "IO-bound"
         self.tau = tau
         self.alpha=alpha
         self.old_tau = -1
         self.wait_times = []
-        self.turnaround_times = [] 
+        self.turnaround_times = []
         self.start_wait = -1
 
     def get_pid(self):
         return self.pid
-    
+
     def get_arrival_time(self):
         return self.arrival_time
-    
+
     def get_bursts(self):
         return self.bursts
 
@@ -56,7 +56,7 @@ class Process:
 
     def get_tau(self):
         return self.tau
-    
+
     def get_old_tau(self):
         return self.old_tau
 
