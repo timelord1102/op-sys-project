@@ -117,12 +117,17 @@ if __name__ == "__main__":
 
     
     ''' beware of aliasing '''
-    l = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
+    # l = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
 
+    processb = Process(pid="A1", arrival_time=10, bursts=[(i * 10,i*4) for i in range(1,2)], process_type="CPU-bound",alpha=alpha,tau=1/l)
+
+    processa = Process(pid="A0", arrival_time=10, bursts=[(i * 10,i*4) for i in range(1,2)], process_type="CPU-bound",alpha=alpha,tau=1/l)
+    # processb.get_bursts()[-1] = (processb.get_bursts()[-1][0]+5,processb.get_bursts()[-1][1])
+    # print(processa.tau,processb.tau)
+    l = [processa,processb]
     # for p in l:
     #     print(p)
     q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
     q.rr(t_slice)
-    # q.sjf()

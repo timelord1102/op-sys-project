@@ -1,11 +1,16 @@
 import math
 
-
-'''
-TODO: wait times and turnaround times for each process
-'''
-
 class Process:
+
+    '''
+    Process class
+    :param: pid (str): Process name, ie 'A0'
+    :param: arrival_time (int): time that the process should first arrive in ready queue
+    :param: bursts (list[int,int]): first index is cpu burst, second index is io burst. 
+                                    ***the last burst consists only of [cpu_burst]***
+    :param: type (str): type of process, either 'CPU-bound' or 'I/O-bound'
+    :param: tau (int): tau value given by command line args
+    '''
 
     def __init__(self, pid, arrival_time, bursts, process_type, alpha, tau):
         self.pid = pid
@@ -15,9 +20,16 @@ class Process:
         self.tau = tau
         self.alpha=alpha
         self.old_tau = -1
+        # current_wait is the accumulator for one specific wait time
+        self.current_wait = 0
+        # wait_times list stores the wait time of each cpu burst
         self.wait_times = []
+        # turnaround_times list stores the turnaround times of each cpu burst 
         self.turnaround_times = [] 
+        # start_wait defines when a process enters the ready queue
         self.start_wait = -1
+        # burst_arrival will be set when a new cpu burst begins execution
+        self.burst_arrival = 0
 
     def get_pid(self):
         return self.pid
@@ -31,17 +43,22 @@ class Process:
     def get_type(self):
         return self.type
 
+    # use this function when a process enters the ready queue with a completely new cpu burst
+    def set_burst_arrival(self, t):
+        self.burst_arrival = t
+
+    # use this function to start waiting, ie when a process enters the queue at any point
     def begin_wait(self,t):
-        # print(f"beginning wait for {self.pid} at time {t}")
         self.start_wait = t
 
-    def end_wait(self,t):
-        # print(f"ending wait for {self.pid} at {t}")
-        self.wait_times.append(t-self.start_wait)
+    # add wait will be called when the process begins cpu execution. use this to actually accumulate 
+    # the wait time of the cpu burst
+    def add_wait(self, t):
+        self.current_wait += t - self.start_wait 
 
+    # turnaround time = completion - start time for a given burst
     def compute_turnaround(self,t):
-        # print(f"computed turnaround for {self.pid}: {t-self.start_wait}ms")
-        self.turnaround_times.append(t-self.start_wait)
+        self.turnaround_times.append(t-self.burst_arrival)
 
     def get_turnaround(self):
         return self.turnaround_times
@@ -49,6 +66,7 @@ class Process:
     def get_wait(self):
         return self.wait_times
 
+    # this is just the formula we were given for tau+1
     def recalculate_tau(self):
         tau_new = self.alpha*self.bursts[0][0] + (1-self.alpha)*self.tau
         self.old_tau = self.tau
@@ -60,8 +78,21 @@ class Process:
     def get_old_tau(self):
         return self.old_tau
 
+    # this function is relevant for preemptions: when only part of the burst is completed, this function 
+    # updates the remaining burst time in the process
+    # i think this function can be one line ill fix it later
+    def partial_burst(self, amount_completed):
+        if len(self.bursts) == 1:
+            self.bursts[0] = [self.bursts[0][0]-amount_completed]
+        else:
+            self.bursts[0] = [self.bursts[0][0]-amount_completed, self.bursts[0][1]]
+
+    # this function is used when a cpu burst fully finishes, including the cpu and io burst. 
+    # the pair is removed from the bursts list, and the accumulator for wait time is set to 0 for the next burst.
     def complete_burst(self):
         self.bursts.pop(0)
+        self.wait_times.append(self.current_wait)
+        self.current_wait = 0
 
     def __lt__(self,other):
         if self.tau != other.tau:
