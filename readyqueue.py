@@ -44,7 +44,7 @@ class ReadyQueue:
     def handle_switch_in_fcfs(self,event,print_event):
         if len(self.ready_queue) > 0 and not self.active:
             self.ready_queue[0].add_wait(event.get_t())
-            if event.get_process().get_type() == "CPU-bound": self.cpu_context+=1
+            if self.ready_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
             p = self.ready_queue[0]
             self.active = p
@@ -54,9 +54,8 @@ class ReadyQueue:
 
     # switch out is reflected at the end of t+t_cs/2. we only add back to the ready queue if theres more than one 
     # burst remaining.
-    # ******* the if statement in this function will probably become if len(event.get_process().get_bursts()) > 0:
     def handle_switch_out_fcfs(self,event,print_event):
-        if len(event.get_process().get_bursts())-1 > 0:
+        if len(event.get_process().get_bursts()) > 0:
             self.ready_queue.append(event.get_process())
         self.active=None
 
@@ -185,8 +184,7 @@ class ReadyQueue:
     def handle_switch_in_sjf(self,event,print_event):
         if len(self.sjf_queue) > 0 and not self.active:
             self.sjf_queue[0].add_wait(event.get_t())
-
-            if event.get_process().get_type() == "CPU-bound": self.cpu_context+=1
+            if self.sjf_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
             p = self.sjf_queue[0]
             self.active = p
@@ -297,7 +295,7 @@ class ReadyQueue:
         print(f"{event} {self.to_str_sjf()}")
         self.io_state = None
         if not self.active and len(self.sjf_queue) == 1:
-            heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in", self.sjf_queue[0], self.t_cs))
+            heapq.heappush(self.event_queue, Event(event.get_t(), "switch_in", self.sjf_queue[0], self.t_cs))
 
     def handle_tau_recalc(self, event, print_event):
         self.active.recalculate_tau()
@@ -496,9 +494,10 @@ class ReadyQueue:
         print(f"cpu turnaround: {cpu_turnaround}")
         print(f"io turnaround: {io_turnaround}")
         print(f"overall turnaround: {turnaround_avg}")
-        print(f"all context switches: {self.cpu_context + self.io_context}")        
         print(f"cpu context switches: {self.cpu_context}")
         print(f"io context switches: {self.io_context}")
+        print(f"all context switches: {self.cpu_context + self.io_context}")        
+
         
 
     # printing for fcfs
