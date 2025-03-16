@@ -114,7 +114,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for FCFS [Q empty]")
             self.termination = event.get_t()
-            self.compute_simout()
+            # self.compute_simout()
 
     # on arrival, add the process to the ready queue and switch in a new process if 
     # nothing is using the cpu currently.
@@ -246,7 +246,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for SJF [Q empty]")
             self.termination = event.get_t()
-            self.compute_simout()
+            # self.compute_simout()
 
     ''' each time a process gets added to the ready queue, we have to insert in tau-order '''
     def handle_arrival_sjf(self,event,print_event):
@@ -406,7 +406,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for RR [Q empty]")
             self.termination = event.get_t()
-            self.compute_simout_rr()
+            # self.compute_simout_rr()
 
     def handle_arrival_rr(self,event,print_event):
         self.ready_queue.append(event.get_process())

@@ -16,22 +16,24 @@ class Event:
         self.process = process
         self.t_cs = t_cs
         self.priority=1000
-        if type == "arrival":
-            self.priority=4
-        elif type == "cpu_start":
-            self.priority=1
-        elif type == "cpu_end":
-            self.priority=0
-        elif type == "switch_out" or type == "switch_out_io":
-            self.priority = -2
-        elif type == "switch_in":
-            self.priority = 100
-        elif type == "io_block":
-            self.priority = 2
-        elif type == "io_end":
-            self.priority=3
+        if type == "switch_out" or type == "switch_out_io":
+            self.priority = -2        
         elif type == "preempt":
             self.priority = -1
+        elif type == "cpu_end":
+            self.priority=0
+        elif type == "cpu_start":
+            self.priority=1
+        elif type == "tau_recalc":
+            self.priority = 2
+        elif type == "io_block":
+            self.priority = 3
+        elif type == "io_end":
+            self.priority=4
+        elif type == "arrival":
+            self.priority=5
+        elif type == "switch_in":
+            self.priority = 100
 
     def get_t(self):
         return self.t
