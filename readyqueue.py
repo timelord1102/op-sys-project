@@ -1,4 +1,5 @@
 from event import Event
+import math
 import heapq
 import copy 
 
@@ -197,7 +198,7 @@ class ReadyQueue:
 
     # switch out is reflected at the end of t+t_cs/2
     def handle_switch_out_sjf(self,event,print_event):
-        if len(event.get_process().get_bursts())-1 > 0:
+        if len(event.get_process().get_bursts()) > 0:
             heapq.heappush(self.sjf_queue,event.get_process())
         self.active=None
 
@@ -466,6 +467,9 @@ class ReadyQueue:
         if not self.active and len(self.ready_queue) == 1:
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in", self.ready_queue[0], self.t_cs))
 
+    def ceil_help(self, val):
+        return math.ceil(val * 1000) / 1000
+
     def compute_simout(self):
         overall_avg = total_bursts = io_bursts = io_wait = cpu_bursts = cpu_wait = 0
         turnaround_avg = io_turnaround = cpu_turnaround = 0
@@ -493,19 +497,19 @@ class ReadyQueue:
         cpu_turnaround /= cpu_bursts
         io_turnaround /= io_bursts
         
-        print(f"cpu utilization: {cpu_utilization}")
-        print(f"cpu wait: {cpu_wait}")
-        print(f"io wait: {io_wait}")
-        print(f"overall wait: {overall_avg}")
-        print(f"cpu turnaround: {cpu_turnaround}")
-        print(f"io turnaround: {io_turnaround}")
-        print(f"overall turnaround: {turnaround_avg}")
-        print(f"cpu context switches: {self.cpu_context}")
-        print(f"io context switches: {self.io_context}")
-        print(f"all context switches: {self.cpu_context + self.io_context}")
-        print(f"cpu-bound preemptions: {self.cpu_preempt}")
-        print(f"io-bound preemptions: {self.io_preempt}")
-        print(f"all-bound preemptions: {self.cpu_preempt+self.io_preempt}")
+        print(f"-- CPU utilization: {self.ceil_help(cpu_utilization*100)}%")
+        print(f"-- CPU-bound average wait time: {self.ceil_help(cpu_wait)} ms")
+        print(f"-- I/O-bound average wait time: {self.ceil_help(io_wait)} ms")
+        print(f"-- overall average wait time: {self.ceil_help(overall_avg)} ms")
+        print(f"-- CPU-bound average turnaround time: {self.ceil_help(cpu_turnaround)} ms")
+        print(f"-- I/O-bound average turnaround time: {self.ceil_help(io_turnaround)} ms")
+        print(f"-- overall average turnaround time: {self.ceil_help(turnaround_avg)} ms")
+        print(f"-- CPU-bound number of context switches: {self.cpu_context}")
+        print(f"-- I/O-bound number of context switches: {self.io_context}")
+        print(f"-- overall number of context switches: {self.cpu_context + self.io_context}")
+        print(f"-- CPU-bound number of preemptions: {self.cpu_preempt}")
+        print(f"-- I/O-bound number of preemptions: {self.io_preempt}")
+        print(f"-- overall number of preemptions: {self.cpu_preempt+self.io_preempt}")
 
 
     def compute_simout_rr(self):
@@ -522,9 +526,9 @@ class ReadyQueue:
                         io_bound_ts+=1
                     io_bursts+=1
                 all_bursts += 1
-        print(f"cpu bound percentage in one time slice: {cpu_bound_ts/cpu_bursts}")
-        print(f"io bound percentage in one time slice: {io_bound_ts/io_bursts}")
-        print(f"overall percentage in one time slide: {(cpu_bound_ts+io_bound_ts)/all_bursts}")
+        print(f"-- CPU-bound percentage of CPU bursts completed within one time slice: {cpu_bound_ts/cpu_bursts}")
+        print(f"-- CPU-bound percentage of CPU bursts completed within one time slice:  {io_bound_ts/io_bursts}")
+        print(f"-- overall percentage of CPU bursts completed within one time slice: {(cpu_bound_ts+io_bound_ts)/all_bursts}")
 
                 
     # printing for fcfs
