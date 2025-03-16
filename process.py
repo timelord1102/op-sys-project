@@ -8,10 +8,11 @@ TODO: wait times and turnaround times for each process
 class Process:
 
     def __init__(self, pid, arrival_time, bursts, process_type, alpha, tau):
+        self.state = "None"
         self.pid = pid
         self.arrival_time = arrival_time
         self.bursts = bursts
-        self.type = "CPU-bound" if process_type else "IO-bound"
+        self.type = process_type
         self.tau = tau
         self.alpha=alpha
         self.old_tau = -1

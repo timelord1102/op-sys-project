@@ -1,8 +1,11 @@
-from process import Process
+from processes import Process
+import tracemalloc
 from readyqueue import ReadyQueue
-from event import Event
 import sys
 import math
+import time
+
+import fcfs
 
 Xi = 0
 
@@ -67,6 +70,9 @@ def create_processes(n, n_cpu, process_names, upper, l, alpha):
 
 if __name__ == "__main__":
 
+    tracemalloc.start()
+    start_time = time.time()
+
     if len(sys.argv) != 9:
         print("ERROR: invalid arguments")
         exit()
@@ -104,7 +110,19 @@ if __name__ == "__main__":
 
     # for p in l:
     #     print(p)
-    q = ReadyQueue(l, t_cs)
+
+    fcfs.fcfs(l,t_cs)
+
+
+    #q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    q.sjf()
+    # q.sjf()
+    # q.fcfs()
+    print("<<< -- MEMORY USAGE")
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"<<< -- -- current: {current / 10**6:.6f}MB; peak: {peak / 10**6:.6f}MB")
+    tracemalloc.stop()
+    print("<<< -- CPU TIME")
+    print(f"<<< -- -- {time.time() - start_time:.6f} seconds")
+    print("<<< -- END OF SIMULATION")
