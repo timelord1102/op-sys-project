@@ -124,5 +124,5 @@ if __name__ == "__main__":
     q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    # q.rr(t_slice)
-    q.fcfs()
+    q.rr(t_slice)
+    # q.fcfs()

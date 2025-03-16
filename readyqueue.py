@@ -1,5 +1,6 @@
 from event import Event
 import heapq
+import copy 
 
 class ReadyQueue:
 
@@ -15,6 +16,7 @@ class ReadyQueue:
 
     def __init__(self, processes, t_cs):
         self.processes=processes
+        self.original_processes=copy.deepcopy(self.processes)
         self.ready_queue = []
         self.sjf_queue = []
         self.io_state = None
@@ -30,6 +32,8 @@ class ReadyQueue:
         for p in processes: self.burst_time += sum(b[0] for b in p.get_bursts())
         self.cpu_context = 0
         self.io_context = 0
+        self.cpu_preempt = 0
+        self.io_preempt = 0
     
     def get_queue(self):
         return self.ready_queue
@@ -312,6 +316,8 @@ class ReadyQueue:
     def preempt(self,event,print_event):
         if len(self.ready_queue) > 0:
             p = event.get_process()
+            if p.get_type() == "CPU-bound": self.cpu_preempt+=1
+            else: self.io_preempt += 1
             self.active.partial_burst(self.t_slice)
             print(f"time {event.get_t()}ms: Time slice expired; preempting process {p.get_pid()} with {p.get_bursts()[0][0]}ms remaining \
 {self.to_str_fcfs()}")
@@ -323,7 +329,7 @@ class ReadyQueue:
             # switch in 
             heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.ready_queue[0], self.t_cs))
         else:
-            print(f"time {event.get_t()}ms: Time slice expired; no preemption because because queue is empty [Q empty]")
+            print(f"time {event.get_t()}ms: Time slice expired; no preemption because ready queue is empty [Q empty]")
             self.active.partial_burst(self.t_slice)
             burst_time = self.active.get_bursts()[0][0]
             if burst_time > self.t_slice:
@@ -366,7 +372,7 @@ class ReadyQueue:
 
     def rr(self,t_slice):
         self.t_slice=t_slice
-        # print(f"time 0ms: Simulator started for RR {self.to_str_fcfs()}")
+        print(f"time 0ms: Simulator started for RR {self.to_str_fcfs()}")
         self.event_queue = [Event(p.get_arrival_time(), "arrival", p, self.t_cs) for p in self.processes]
         heapq.heapify(self.event_queue)
 
@@ -399,7 +405,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for RR [Q empty]")
             self.termination = event.get_t()
-            self.compute_simout()
+            self.compute_simout_rr()
 
     def handle_arrival_rr(self,event,print_event):
         self.ready_queue.append(event.get_process())
@@ -496,10 +502,31 @@ class ReadyQueue:
         print(f"overall turnaround: {turnaround_avg}")
         print(f"cpu context switches: {self.cpu_context}")
         print(f"io context switches: {self.io_context}")
-        print(f"all context switches: {self.cpu_context + self.io_context}")        
+        print(f"all context switches: {self.cpu_context + self.io_context}")
+        print(f"cpu-bound preemptions: {self.cpu_preempt}")
+        print(f"io-bound preemptions: {self.io_preempt}")
+        print(f"all-bound preemptions: {self.cpu_preempt+self.io_preempt}")
 
-        
 
+    def compute_simout_rr(self):
+        self.compute_simout()
+        cpu_bound_ts = io_bound_ts = cpu_bursts = io_bursts = all_bursts = 0
+        for p in self.original_processes:
+            for b in p.get_bursts():
+                if p.get_type() == "CPU-bound":
+                    if b[0] <= self.t_slice:
+                        cpu_bound_ts+=1
+                    cpu_bursts += 1
+                else:
+                    if b[0] <= self.t_slice:
+                        io_bound_ts+=1
+                    io_bursts+=1
+                all_bursts += 1
+        print(f"cpu bound percentage in one time slice: {cpu_bound_ts/cpu_bursts}")
+        print(f"io bound percentage in one time slice: {io_bound_ts/io_bursts}")
+        print(f"overall percentage in one time slide: {(cpu_bound_ts+io_bound_ts)/all_bursts}")
+
+                
     # printing for fcfs
     def to_str_fcfs(self):
         if len(self.ready_queue) == 0:

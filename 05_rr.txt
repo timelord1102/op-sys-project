@@ -4993,19 +4993,3 @@ time 136325ms: Time slice expired; no preemption because ready queue is empty [Q
 time 136389ms: Time slice expired; no preemption because ready queue is empty [Q empty]
 time 136421ms: Process A9 terminated [Q empty]
 time 136423ms: Simulator ended for RR [Q empty]
-cpu utilization: 0.9317270548221341
-cpu wait: 4895.023102310231
-io wait: 1975.516129032258
-overall wait: 4399.106849315069
-cpu turnaround: 5321.320132013201
-io turnaround: 2078.6935483870966
-overall turnaround: 4770.517808219178
-cpu context switches: 1987
-io context switches: 127
-all context switches: 2114
-cpu-bound preemptions: 1684
-io-bound preemptions: 65
-all-bound preemptions: 1749
-cpu bound percentage in one time slice: 0.17491749174917492
-io bound percentage in one time slice: 0.5161290322580645
-overall percentage in one time slide: 0.2328767123287671

@@ -16,6 +16,7 @@ class Process:
         self.pid = pid
         self.arrival_time = arrival_time
         self.bursts = bursts
+        self.original_bursts = bursts.copy()
         self.type = process_type
         self.tau = tau
         self.alpha=alpha
@@ -91,8 +92,12 @@ class Process:
     # the pair is removed from the bursts list, and the accumulator for wait time is set to 0 for the next burst.
     def complete_burst(self):
         self.bursts.pop(0)
+        self.original_bursts.pop(0)
         self.wait_times.append(self.current_wait)
         self.current_wait = 0
+
+    def get_original_bursts(self):
+        return self.original_bursts
 
     def __lt__(self,other):
         if self.tau != other.tau:
