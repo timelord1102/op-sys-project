@@ -1,13 +1,21 @@
 from processes import Process
-import tracemalloc
 from readyqueue import ReadyQueue
+import tracemalloc
 import sys
 import math
 import time
 
 import fcfs
+import sjf
+import srt
 
 Xi = 0
+
+def reset(processes, l):
+    for p in processes:
+        p.reset()
+        p.tau = math.ceil(1/l)
+    return l
 
 def srand48(seedval: int) -> None:
     """
@@ -106,19 +114,22 @@ if __name__ == "__main__":
 
 
     ''' beware of aliasing '''
-    l = create_processes(n, n_cpu,processes,upper,l,alpha)
+    p = create_processes(n, n_cpu,processes,upper,l,alpha)
 
     # for p in l:
     #     print(p)
 
-    fcfs.fcfs(l,t_cs)
-
+    fcfs.fcfs(p,t_cs)
+    reset(p, l)
+    sjf.sjf(p,t_cs)
+    reset(p, l)
+    srt.srt(p,t_cs)
 
     #q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    # q.sjf()
-    # q.fcfs()
+    #q.sjf()
+    #q.fcfs()
     print("<<< -- MEMORY USAGE")
     current, peak = tracemalloc.get_traced_memory()
     print(f"<<< -- -- current: {current / 10**6:.6f}MB; peak: {peak / 10**6:.6f}MB")
