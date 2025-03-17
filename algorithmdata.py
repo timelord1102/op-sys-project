@@ -1,4 +1,5 @@
 import io
+from math import ceil
 import re
 
 
@@ -21,9 +22,9 @@ class AlgorithmData:
         self.cpu_busy = 0;
 
     def __str__(self):
-        s = "-- CPU utilization: " + "{:.3f}".format((self.cpu_busy/self.total_run_time if self.total_run_time != 0 else 0)*100) + "%\n"
-        s += "-- CPU-bound average wait time: " + "{:.3f}".format(self.cpu_total_wait/self.cpu_context_switches if self.cpu_context_switches != 0 else 0) + " ms\n"
-        s += "-- IO-bound average wait time: " + "{:.3f}".format(self.io_total_wait/self.io_context_switches if self.io_context_switches != 0 else 0) + " ms\n"
+        s = "-- CPU utilization: " + "{:.3f}".format(round((self.cpu_busy/self.total_run_time if self.total_run_time != 0 else 0)*100, 3)) + "%\n"
+        s += "-- CPU-bound average wait time: " + "{:.3f}".format(round(self.cpu_total_wait/self.cpu_context_switches if self.cpu_context_switches != 0 else 0, 3)) + " ms\n"
+        s += "-- IO-bound average wait time: " + "{:.3f}".format(round(self.io_total_wait/self.io_context_switches if self.io_context_switches != 0 else 0, 3)) + " ms\n"
         s += "-- overall average wait time: " + "{:.3f}".format(round((self.cpu_total_wait + self.io_total_wait)/(self.cpu_context_switches + self.io_context_switches) if (self.cpu_context_switches + self.io_context_switches) != 0 else 0, 3)) + " ms\n"
         s += "-- CPU-bound average turnaround time: " + "{:.3f}".format(round(self.cpu_total_turnaround/self.cpu_context_switches if self.cpu_context_switches != 0 else 0, 3)) + " ms\n"
         s += "-- IO-bound average turnaround time: " + "{:.3f}".format(round(self.io_total_turnaround/self.io_context_switches if self.io_context_switches != 0 else 0, 3)) + " ms\n"

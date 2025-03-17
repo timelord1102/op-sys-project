@@ -37,6 +37,12 @@ def fcfs(processes, t_cs):
         elif process.get_state() == "ready" and active:
             handle_ready_with_active(process, active, queue, t_cs)
 
+        elif process.get_state() == "switch-out":
+            t, active = handle_switch_out(process, queue, t_cs, active, data)
+
+        elif process.get_state() == "switch-in":
+            t = switch_in(process, queue, t, t_cs)
+
     print(f"time {t}ms: Simulator ended for FCFS {queue}")
     data.total_run_time = t
     print(data)
@@ -55,6 +61,17 @@ def handle_arrival(process, active, queue, data, t_cs):
         print(f"time {t}ms: Process {process.get_pid()} arrived; added to ready queue {queue}")
     return t
 
+def switch_in(process, queue, t, t_cs):
+    """Handle a process that is switching into the CPU."""
+    process.set_state("running")
+    burst_duration = process.get_bursts()[0][0]
+    t = process.get_sort_time()
+    process.set_sort_time(t + burst_duration + t_cs // 2)
+    queue.add(process)
+    if t < 10000:
+        print(f"time {t}ms: Process {process.get_pid()} started using the CPU for {burst_duration}ms burst {queue}")
+    return t
+
 
 def dispatch_process(process, active, queue, data, t_cs):
     """
@@ -68,11 +85,10 @@ def dispatch_process(process, active, queue, data, t_cs):
         data.io_total_wait += process.get_sort_time() - process.get_ready_time()
 
     # Dispatch: Add half the context switch time before running.
-    t = process.get_sort_time() + t_cs // 2
+    t = process.get_sort_time()
     active = process
-    process.set_state("running")
-    burst_duration = process.get_bursts()[0][0]
-    process.set_sort_time(process.get_sort_time() + burst_duration + t_cs // 2)
+    process.set_state("switch-in")
+    process.set_sort_time(process.get_sort_time() + t_cs // 2)
     queue.add(process)
 
     if process.get_type():
@@ -81,9 +97,6 @@ def dispatch_process(process, active, queue, data, t_cs):
     else:
         data.io_context_switches += 1
         data.io_total_bursts += 1
-
-    if t < 10000:
-        print(f"time {t}ms: Process {process.get_pid()} started using the CPU for {burst_duration}ms burst {queue}")
     return t, active
 
 
@@ -97,12 +110,10 @@ def handle_running(process, queue, data, t, t_cs):
     """
     burst_duration = process.get_bursts()[0][0]
     data.cpu_busy += burst_duration
-    t = process.get_sort_time()
-
+    t = process.get_sort_time() - t_cs // 2
     if len(process.get_bursts()) == 1:
         process.set_state("terminated")
         print(f"time {t}ms: Process {process.get_pid()} terminated {queue}")
-        active = None
         t += t_cs // 2
         if process.get_type():
             data.cpu_total_turnaround += t - process.get_ready_time()
@@ -112,22 +123,28 @@ def handle_running(process, queue, data, t, t_cs):
             data.io_total_bursts += 1
         return t, None, True
     else:
-        t += t_cs // 2
         # Schedule I/O: Add the I/O burst time plus half context switch time.
-        process.set_sort_time(process.get_sort_time() + process.get_bursts()[0][1] + t_cs // 2)
-        process.remove_burst()
-        process.set_state("waiting")
-        if process.get_type():
-            data.cpu_total_turnaround += t - process.get_ready_time()
-        else:
-            data.io_total_turnaround += t - process.get_ready_time()
+
+        process.set_state("switch-out")
         queue.add(process)
         if t < 10000:
-            print(f"time {t}ms: Process {process.get_pid()} completed a CPU burst; {len(process.get_bursts())} bursts to go {queue}")
-            print(f"time {t}ms: Process {process.get_pid()} switching out of CPU; blocking on I/O until time {process.get_sort_time()}ms {queue}")
-        active = None
-        return t, active, False
+            print(f"time {t}ms: Process {process.get_pid()} completed a CPU burst; {len(process.get_bursts()) - 1} bursts to go {queue}")
+        return t, process, False
 
+def handle_switch_out(process, queue, t_cs, active, data):
+    """Handle a process that is switching out of the CPU."""
+    process.set_state("waiting")
+    t = process.get_sort_time() - t_cs // 2
+    process.set_sort_time(t + process.get_bursts()[0][1] + t_cs // 2)
+    if t < 10000:
+        print(f"time {t}ms: Process {process.get_pid()} switching out of CPU; blocking on I/O until time {process.get_sort_time()}ms {queue}")
+    process.remove_burst()
+    queue.add(process)
+    if process.get_type():
+        data.cpu_total_turnaround += t - process.get_ready_time() + t_cs // 2
+    else:
+        data.io_total_turnaround += t - process.get_ready_time() + t_cs // 2
+    return t, None
 
 def handle_waiting(process, queue, t_cs, active):
     """Handle a process that has completed I/O and is ready to run again."""
@@ -142,7 +159,7 @@ def handle_waiting(process, queue, t_cs, active):
 
 def handle_ready_with_active(process, active, queue, t_cs):
     """If a process is ready while another is active, adjust its sort time."""
-    process.set_sort_time(active.get_sort_time() + t_cs // 2)
+    process.set_sort_time(active.get_sort_time())
     queue.add(process)
 
 
@@ -153,5 +170,5 @@ def set_ready(process, active, t_cs):
     """
     process.set_state("ready")
     if active:
-        process.set_sort_time(active.get_sort_time() + t_cs // 2)
+        process.set_sort_time(active.get_sort_time())
     return process
