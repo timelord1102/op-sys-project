@@ -1,6 +1,5 @@
 from process import Process
 from readyqueue import ReadyQueue
-from event import Event
 import sys
 import math
 
@@ -38,14 +37,14 @@ def drand48() -> float:
     return Xi / (2**48)
 
 def next_exp(upper_bound,lambda_val):
-    
+
     r = drand48()
 
     x = -math.log( r ) / lambda_val
     while (x > upper_bound):
         r = drand48()
         x = -math.log( r ) / lambda_val
-    
+
     return x
 
 def create_cpu_process(n, process_names, upper, l, alpha):
@@ -55,10 +54,10 @@ def create_cpu_process(n, process_names, upper, l, alpha):
         num_bursts = math.ceil(drand48() * 32)
         bursts = []
         for j in range(0, num_bursts-1):
-            cpu_burst = math.ceil(next_exp(upper,l)) * 4 
+            cpu_burst = math.ceil(next_exp(upper,l)) * 4
             io_burst = math.ceil(next_exp(upper,l))
             bursts.append([cpu_burst,io_burst])
-        cpu_burst = math.ceil(next_exp(upper,l)) * 4 
+        cpu_burst = math.ceil(next_exp(upper,l)) * 4
         bursts.append([cpu_burst])
         tau = math.ceil(1/l)
         processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts,
@@ -72,13 +71,13 @@ def create_io_process(n, process_names, upper, l, alpha):
         num_bursts = math.ceil(drand48() * 32)
         bursts = []
         for j in range(0, num_bursts-1):
-            cpu_burst = math.ceil(next_exp(upper,l)) 
+            cpu_burst = math.ceil(next_exp(upper,l))
             io_burst = math.ceil(next_exp(upper,l)) * 8
             bursts.append([cpu_burst,io_burst])
-        cpu_burst = math.ceil(next_exp(upper,l)) 
+        cpu_burst = math.ceil(next_exp(upper,l))
         bursts.append([cpu_burst])
         tau = math.ceil(1/l)
-        processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts, 
+        processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts,
                                  process_type="I/O-bound", alpha=alpha, tau=tau))
     return processes
 
@@ -96,7 +95,7 @@ if __name__ == "__main__":
     t_cs = int(sys.argv[6])
     alpha = float(sys.argv[7])
     t_slice = int(sys.argv[8])
-    
+
     # if (n_cpu == 1):
     #     print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound process")
     # else:
@@ -109,13 +108,13 @@ if __name__ == "__main__":
     alphabet = []
     for i in range(26):
         alphabet.append(chr(i+65))
-    
+
     processes = []
-    for a in alphabet: 
+    for a in alphabet:
         for i in range(10):
             processes.append(f"{a}{i}")
 
-    
+
     ''' beware of aliasing '''
     l = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
 
@@ -124,4 +123,4 @@ if __name__ == "__main__":
     q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    q.sjf()
+    q.srt()

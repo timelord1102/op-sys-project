@@ -21,10 +21,10 @@ class Event:
 
     def get_t(self):
         return self.t
-    
+
     def get_process(self):
         return self.process
-    
+
     # edit to account for other ties
     def __lt__(self,other):
         if self.t != other.get_t():
@@ -32,8 +32,8 @@ class Event:
         if self.priority != other.priority:
             return self.priority < other.priority
         return self.process.get_pid() < other.process.get_pid()
-        
-    ''' TODO: string functions for each algo (some need tau, others don't)''' 
+
+    ''' TODO: string functions for each algo (some need tau, others don't)'''
 #     def __str__(self):
 #         if self.type == "arrival":
 #             return f"time {self.t}ms: Process {self.process.get_pid()} arrived; added to ready queue"
@@ -72,5 +72,7 @@ class Event:
         elif self.type == "tau_recalc":
             return f"time {self.t}ms: Recalculated tau for process {self.process.get_pid()}: old tau {self.process.get_old_tau()}ms ==> \
 new tau {self.process.get_tau()}ms"
+        elif self.type == "preempt":
+            return f"time {self.t}ms: Process {self.process.get_pid()} (tau {self.process.get_tau()}ms) preempted )"
         else:
             return f"t: {self.t}, type: {self.type}, pid: {self.process.get_pid()}"
