@@ -19,6 +19,7 @@ class Process:
         self.turnaround_times = []
         self.start_wait = -1
         self.start_time = -1
+        self.remaining_time = bursts[0][0]
 
     def get_pid(self):
         return self.pid
@@ -62,10 +63,12 @@ class Process:
         return self.old_tau
 
     def preempt_burst(self, remaining_time):
-        self.bursts[0][0] = remaining_time
+        self.remaining_time = remaining_time
 
     def complete_burst(self):
         self.bursts.pop(0)
+        if len(self.bursts) > 0:
+            self.remaining_time = self.bursts[0][0]
 
     def __lt__(self,other):
         if self.tau != other.tau:

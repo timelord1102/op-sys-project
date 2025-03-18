@@ -57,7 +57,7 @@ class Event:
         if self.type == "arrival":
             return f"time {self.t}ms: Process {self.process.get_pid()} (tau {self.process.get_tau()}ms) arrived; added to ready queue"
         elif self.type == "cpu_start":
-            return f"time {self.t}ms: Process {self.process.get_pid()} (tau {self.process.get_tau()}ms) started using the CPU for {self.process.get_bursts()[0][0]}ms burst"
+            return f"time {self.t}ms: Process {self.process.get_pid()} (tau {self.process.get_tau()}ms) started using the CPU for {self.process.remaining_time}ms burst"
         elif self.type == "cpu_end":
             if len(self.process.get_bursts())-1 == 0:
                 return f"time {self.t}ms: Process {self.process.get_pid()} terminated"
