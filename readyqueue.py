@@ -114,7 +114,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for FCFS [Q empty]")
             self.termination = event.get_t()
-            # self.compute_simout()
+            self.compute_simout()
 
     # on arrival, add the process to the ready queue and switch in a new process if 
     # nothing is using the cpu currently.
@@ -406,7 +406,7 @@ class ReadyQueue:
         elif event.type == "terminate":
             print(f"time {event.get_t()}ms: Simulator ended for RR [Q empty]")
             self.termination = event.get_t()
-            # self.compute_simout_rr()
+            self.compute_simout_rr()
 
     def handle_arrival_rr(self,event,print_event):
         self.ready_queue.append(event.get_process())
@@ -485,25 +485,22 @@ class ReadyQueue:
                 io_bursts += len(p.get_wait())
                 io_turnaround += sum(p.get_turnaround())
                 io_wait += sum(p.get_wait())
-        
-        if total_bursts == 0: total_bursts = 1
-        if cpu_bursts == 0: cpu_bursts = 1
-        if io_bursts == 0: io_bursts = 1
+
         cpu_utilization = self.burst_time / self.termination
-        overall_avg /= total_bursts
-        cpu_wait /= cpu_bursts
-        io_wait /= io_bursts 
-        turnaround_avg /= total_bursts
-        cpu_turnaround /= cpu_bursts
-        io_turnaround /= io_bursts
+        overall_avg /= total_bursts if total_bursts > 0 else 0
+        cpu_wait /= cpu_bursts if cpu_bursts > 0 else 0
+        io_wait /= io_bursts if io_bursts > 0 else 0
+        turnaround_avg /= total_bursts if total_bursts > 0 else 0
+        cpu_turnaround /= cpu_bursts if cpu_bursts > 0 else 0
+        io_turnaround /= io_bursts if io_bursts > 0 else 0
         
-        print(f"-- CPU utilization: {self.ceil_help(cpu_utilization*100)}%")
-        print(f"-- CPU-bound average wait time: {self.ceil_help(cpu_wait)} ms")
-        print(f"-- I/O-bound average wait time: {self.ceil_help(io_wait)} ms")
-        print(f"-- overall average wait time: {self.ceil_help(overall_avg)} ms")
-        print(f"-- CPU-bound average turnaround time: {self.ceil_help(cpu_turnaround)} ms")
-        print(f"-- I/O-bound average turnaround time: {self.ceil_help(io_turnaround)} ms")
-        print(f"-- overall average turnaround time: {self.ceil_help(turnaround_avg)} ms")
+        print("-- CPU utilization: {:.3f}%".format(self.ceil_help(cpu_utilization*100)))
+        print("-- CPU-bound average wait time: {:.3f} ms".format(self.ceil_help(cpu_wait)))
+        print("-- I/O-bound average wait time: {:.3f} ms".format(self.ceil_help(io_wait)))
+        print("-- overall average wait time: {:.3f} ms".format(self.ceil_help(overall_avg)))
+        print("-- CPU-bound average turnaround time: {:.3f} ms".format(self.ceil_help(cpu_turnaround)))
+        print("-- I/O-bound average turnaround time: {:.3f} ms".format(self.ceil_help(io_turnaround)))
+        print("-- overall average turnaround time: {:.3f} ms".format(self.ceil_help(turnaround_avg)))
         print(f"-- CPU-bound number of context switches: {self.cpu_context}")
         print(f"-- I/O-bound number of context switches: {self.io_context}")
         print(f"-- overall number of context switches: {self.cpu_context + self.io_context}")
@@ -526,9 +523,12 @@ class ReadyQueue:
                         io_bound_ts+=1
                     io_bursts+=1
                 all_bursts += 1
-        print(f"-- CPU-bound percentage of CPU bursts completed within one time slice: {cpu_bound_ts/cpu_bursts}")
-        print(f"-- CPU-bound percentage of CPU bursts completed within one time slice:  {io_bound_ts/io_bursts}")
-        print(f"-- overall percentage of CPU bursts completed within one time slice: {(cpu_bound_ts+io_bound_ts)/all_bursts}")
+        cpu_pct = self.ceil_help(100*cpu_bound_ts/cpu_bursts) if cpu_bursts > 0 else 0
+        io_pct = self.ceil_help(100*io_bound_ts/io_bursts) if io_bursts > 0 else 0
+        overall_pct = self.ceil_help(100*(cpu_bound_ts+io_bound_ts)/all_bursts) if all_bursts > 0 else 0
+        print("-- CPU-bound percentage of CPU bursts completed within one time slice: {:.3f}%".format(cpu_pct))
+        print("-- CPU-bound percentage of CPU bursts completed within one time slice:  {:.3f}%".format(io_pct))
+        print("-- overall percentage of CPU bursts completed within one time slice: {:.3f}%".format(overall_pct))
 
                 
     # printing for fcfs
