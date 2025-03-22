@@ -19,6 +19,7 @@ class Process:
         self.original_bursts = bursts.copy()
         self.type = process_type
         self.tau = tau
+        self.remaining_tau = tau
         self.alpha=alpha
         self.old_tau = -1
         # current_wait is the accumulator for one specific wait time
@@ -31,6 +32,7 @@ class Process:
         self.start_wait = -1
         # burst_arrival will be set when a new cpu burst begins execution
         self.burst_arrival = 0
+        self.cpu_start = 0
 
     def get_pid(self):
         return self.pid
@@ -67,11 +69,25 @@ class Process:
     def get_wait(self):
         return self.wait_times
 
+    # the following two functions are used for predicted tau values
+    def set_cpu_start(self,t):
+        self.cpu_start = t
+
+    def set_remaining_tau(self, tau):
+        self.remaining_tau = tau
+    
+    def calc_remaining_tau(self,t):
+        return self.remaining_tau - (t - self.cpu_start)
+
+    def get_remaining_tau(self):
+        return self.remaining_tau
+    
     # this is just the formula we were given for tau+1
     def recalculate_tau(self):
-        tau_new = self.alpha*self.bursts[0][0] + (1-self.alpha)*self.tau
+        tau_new = self.alpha*self.original_bursts[0][0] + (1-self.alpha)*self.tau
         self.old_tau = self.tau
         self.tau = math.ceil(tau_new)
+        self.remaining_tau = self.tau
 
     def get_tau(self):
         return self.tau
@@ -100,8 +116,8 @@ class Process:
         return self.original_bursts
 
     def __lt__(self,other):
-        if self.tau != other.tau:
-            return self.tau < other.tau
+        if self.remaining_tau != other.remaining_tau:
+            return self.remaining_tau < other.remaining_tau
         return self.pid < other.pid
 
     def __str__(self):

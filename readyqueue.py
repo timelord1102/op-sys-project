@@ -310,6 +310,176 @@ class ReadyQueue:
 #                                                               SRT
 # --------------------------------------------------------------------------------------------------------------------------------------
 
+    def preempt_srt(self, event, print_event):
+        # p = self.sjf_queue[0]
+        # remaining = self.active.calc_remaining_tau(event.get_t())
+        # self.active.set_remaining_tau(remaining)
+        # self.active.partial_burst(event.get_t()-self.active.cpu_start)
+        # print(f"remaining on the top burst during preempt: {self.active.bursts[0][0]}")
+        # switch out
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+        # switch in 
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.sjf_queue[0], self.t_cs))
+
+    # switch in happens at t but stalls t_cs/2 ms before beginning cpu_start
+    def handle_switch_in_srt(self,event,print_event):
+        if len(self.sjf_queue) > 0 and not self.active:
+            self.sjf_queue[0].add_wait(event.get_t())
+            if self.sjf_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
+            else: self.io_context+=1
+            p = self.sjf_queue[0]
+            self.active = p
+            heapq.heappop(self.sjf_queue)
+            heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "cpu_start", p, self.t_cs))
+
+    # switch out is reflected at the end of t+t_cs/2
+    def handle_switch_out_srt(self,event,print_event):
+        if len(event.get_process().get_bursts()) > 0:
+            heapq.heappush(self.sjf_queue,event.get_process())
+        self.active=None
+
+    def handle_io_switch_out_srt(self,event,print_event):
+        self.io_state = self.active
+        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.active, self.t_cs))
+
+        if len(self.sjf_queue) > 0:
+            heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_in", self.sjf_queue[0], self.t_cs))
+    
+    def io_active_switchout_srt(self,event,print_event):
+        self.active=None
+
+    def srt(self):
+        print(f"time 0ms: Simulator started for SRT {self.to_str_sjf()}")
+        self.event_queue = [Event(p.get_arrival_time(), "arrival", p, self.t_cs) for p in self.processes]
+        heapq.heapify(self.event_queue)
+
+        # execute events as they arrive
+        while (len(self.event_queue)>0):
+            self.execute_event_srt(heapq.heappop(self.event_queue))
+
+    def execute_event_srt(self, event):
+        print_event = event.get_t() < 10000
+        if event.type == "arrival":
+            self.handle_arrival_srt(event,print_event)
+        elif event.type == "switch_in":
+            self.handle_switch_in_srt(event,print_event)
+        elif event.type == "switch_out":
+            self.handle_switch_out_srt(event,print_event)
+        elif event.type == "switch_out_io":
+            self.io_active_switchout_srt(event,print_event)
+        elif event.type == "io_switch":
+            self.handle_io_switch_out_srt(event,print_event)
+        elif event.type == "cpu_start":
+            self.handle_cpu_start_srt(event,print_event)
+        elif event.type == "cpu_end": 
+            self.handle_cpu_end_srt(event,print_event)
+        elif event.type == "io_block":
+            self.handle_io_block_srt(event,print_event)
+        elif event.type == "io_end":
+            self.handle_io_end_srt(event,print_event)
+        elif event.type == "tau_recalc":
+            self.handle_tau_recalc_srt(event,print_event)
+        elif event.type == "preempt":
+            self.preempt_srt(event,print_event)
+        elif event.type == "terminate":
+            print(f"time {event.get_t()}ms: Simulator ended for SRT [Q empty]")
+            self.termination = event.get_t()
+            # self.compute_simout()
+
+    ''' each time a process gets added to the ready queue, we have to insert in tau-order '''
+    ''' this will change, have to account for preemptions '''
+    def handle_arrival_srt(self,event,print_event):
+        heapq.heappush(self.sjf_queue, event.get_process())
+        print(f"{event} {self.to_str_sjf()}")
+        
+        if self.active:
+            remaining = self.active.calc_remaining_tau(event.get_t())
+            if remaining > event.get_process().get_tau():
+                self.active.set_remaining_tau(remaining)
+                self.active.partial_burst(event.get_t()-self.active.cpu_start)
+                heapq.heappush(self.event_queue, Event(event.get_t(),"preempt",self.active,self.t_cs))
+        else:
+            # add it to the active state in t_cs/2 ms, but remove from ready queue immediately
+            heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in",event.get_process(),self.t_cs))
+    
+    ''' we don't know when the cpu end will happen, so this will change'''
+    def handle_cpu_start_srt(self,event,print_event):
+        print(f"{event} {self.to_str_sjf()}")
+        self.active.set_cpu_start(event.get_t())
+        heapq.heappush(self.event_queue,Event(event.get_t()+self.active.get_bursts()[0][0],"cpu_end",self.active, self.t_cs))
+
+    '''
+    cpu end: 
+      check if the process is actually ending (must be in active spot, partial burst should bring it to 0)
+      if bursts[0][0] == 0:
+        block on io
+        bring the next process in
+    '''
+    def handle_cpu_end_srt(self,event,print_event):
+        p = event.get_process()
+        if p.get_pid() == self.active.get_pid():
+            # print(f"time {event.get_t()}ms: remaining time: {p.bursts[0][0]}-({event.get_t()}-{p.cpu_start})")
+            p.partial_burst(event.get_t()-p.cpu_start)
+            # partial_burst updates the top burst time, so we have to adjust cpu_start
+            p.set_cpu_start(event.get_t())
+            # burst completed, more to complete
+            if p.bursts[0][0] == 0 and len(event.process.get_bursts())-1 > 0:
+                print(f"{event} {self.to_str_sjf()}")
+                heapq.heappush(self.event_queue,Event(event.get_t(), "tau_recalc", self.active, self.t_cs))
+                heapq.heappush(self.event_queue,Event(event.get_t(), "io_block", self.active, self.t_cs))                
+            # burst completed, no more to complete
+            # switch out & switch next in, or terminate
+            elif p.bursts[0][0] == 0:
+                print(f"{event} {self.to_str_sjf()}")
+
+                # pop final cpu burst & append final wait time
+                p.complete_burst()
+        
+                # switch out actually happens at t+t_cs/2, switch in happens at t+t_cs/2 but waits t_cs/2 for cpu_start
+                heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+                if len(self.sjf_queue) > 0:
+                    heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.sjf_queue[0], self.t_cs))
+                elif len(self.ready_queue) == 0 and len(self.event_queue) == 1: # only the switch out remains on the queue
+                    heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2),"terminate",None,self.t_cs))
+
+
+    def handle_io_block_srt(self,event,print_event):
+        print(f"{event} {self.to_str_sjf()}")
+        p = event.get_process()
+        heapq.heappush(self.event_queue, Event(event.get_t(),"io_switch",p,self.t_cs))
+        heapq.heappush(self.event_queue, Event(event.get_t()+p.get_bursts()[0][1]+int(self.t_cs/2), "io_end", p, self.t_cs))
+
+    '''
+    io_end:
+      always add to ready queue, complete cpu burst, set io_state to None.
+      if there's an active process, compare its remaining time to the process tau
+        if process tau is less than remaining, preempt
+      if there's no active process, switch back into the cpu
+    
+    '''
+    def handle_io_end_srt(self,event,print_event):
+        p = event.get_process()
+        p.complete_burst()
+        heapq.heappush(self.sjf_queue, event.get_process())
+        self.io_state = None  
+        if self.active: 
+            remaining = self.active.calc_remaining_tau(event.get_t())
+            # print(f"time {event.get_t()}ms: predicted remaining time: {remaining}")
+            if p.get_tau() < remaining: 
+                self.active.set_remaining_tau(remaining)
+                self.active.partial_burst(event.get_t()-self.active.cpu_start)
+                print(f"time {event.get_t()}ms: Process {p.get_pid()} (tau {p.get_tau()}ms) completed I/O; preempting \
+{self.active.get_pid()} (predicted remaining time {remaining}ms) {self.to_str_sjf()}")
+                heapq.heappush(self.event_queue, Event(event.get_t(), "preempt", self.active, self.t_cs))
+                return
+        print(f"{event} {self.to_str_sjf()}")
+        if not self.active and len(self.sjf_queue) == 1:
+            heapq.heappush(self.event_queue, Event(event.get_t(), "switch_in", self.sjf_queue[0], self.t_cs))
+
+    def handle_tau_recalc_srt(self, event, print_event):
+        self.active.recalculate_tau()
+        print(f"{event} {self.to_str_sjf()}")
+
 # --------------------------------------------------------------------------------------------------------------------------------------
 #                                                               RR
 # --------------------------------------------------------------------------------------------------------------------------------------
