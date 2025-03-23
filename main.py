@@ -82,7 +82,10 @@ def create_io_process(n, process_names, upper, l, alpha):
                                  process_type="I/O-bound", alpha=alpha, tau=tau))
     return processes
 
-def ceil_help(val):
+def ceil_help(num,den):
+    if den == 0:
+        return 0
+    val = num/den
     return math.ceil(val * 1000) / 1000
 
 def get_process_stats(processes):
@@ -106,14 +109,12 @@ def get_process_stats(processes):
                 io_bound_cpu += burst[0]
                 if len(burst) > 1:
                     io_bound_io += burst[1]
-    cpu_bound_avg_cpu = ceil_help(cpu_bound_cpu/cpu_bound_cpu_bursts) if cpu_bound_cpu_bursts > 0 else 0
-    io_bound_avg_cpu = ceil_help(io_bound_cpu/io_bound_cpu_bursts) if io_bound_cpu_bursts > 0 else 0
-    overall_cpu = ceil_help((cpu_bound_cpu + io_bound_cpu) / 
-                            (cpu_bound_cpu_bursts + io_bound_cpu_bursts)) if (cpu_bound_cpu_bursts + io_bound_cpu_bursts) > 0 else 0
-    cpu_bound_avg_io = ceil_help(cpu_bound_io/cpu_bound_io_bursts) if cpu_bound_cpu_bursts > 0 else 0 
-    io_bound_avg_io = ceil_help(io_bound_io/io_bound_io_bursts) if cpu_bound_cpu_bursts > 0 else 0
-    overall_io = ceil_help((cpu_bound_io + io_bound_io) / 
-                            (cpu_bound_io_bursts + io_bound_io_bursts)) if (cpu_bound_io_bursts + io_bound_io_bursts) > 0 else 0
+    cpu_bound_avg_cpu = ceil_help(cpu_bound_cpu,cpu_bound_cpu_bursts)
+    io_bound_avg_cpu = ceil_help(io_bound_cpu,io_bound_cpu_bursts)
+    overall_cpu = ceil_help((cpu_bound_cpu + io_bound_cpu),(cpu_bound_cpu_bursts + io_bound_cpu_bursts))
+    cpu_bound_avg_io = ceil_help(cpu_bound_io,cpu_bound_io_bursts) 
+    io_bound_avg_io = ceil_help(io_bound_io,io_bound_io_bursts)
+    overall_io = ceil_help((cpu_bound_io + io_bound_io),(cpu_bound_io_bursts + io_bound_io_bursts))
     res = f"-- number of processes: {numprocesses}\n"
     res += f"-- number of CPU-bound processes: {num_cpu}\n"
     res += f"-- number of I/O-bound processes: {num_io}\n"
