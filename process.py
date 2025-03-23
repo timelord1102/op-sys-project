@@ -70,10 +70,16 @@ class Process:
         if len(self.bursts) > 0:
             self.remaining_time = self.bursts[0][0]
 
+    def predict_tau(self, t):
+        return (self.tau - (t - self.start_time))
+
     def __lt__(self,other):
         if self.tau != other.tau:
             return self.tau < other.tau
         return self.pid < other.pid
+
+    def __eq__(self,other):
+        return self.pid == other.pid
 
     def __str__(self):
         s=''
