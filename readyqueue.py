@@ -24,7 +24,7 @@ class ReadyQueue:
         self.active = None
         self.event_queue=[]
         self.t_cs = t_cs
-
+        self.switching = False
         # everything under here is used for the statistics, worry about this once the algo works
         # termination is the time the algo completes 
         self.termination = 0
@@ -42,12 +42,10 @@ class ReadyQueue:
 # --------------------------------------------------------------------------------------------------------------------------------------
 #                                                               FCFS
 # --------------------------------------------------------------------------------------------------------------------------------------
-    # switch the first process from the ready queue into the active state. only perform
-    # this action if there's a process in the ready queue and nothing is already using the cpu.
-    # switch ins happen immediately in terms of printing, but the process waits in the active state for 
-    # t_cs/2ms - this is why we queue the cpu_start with the added time
+    ''' switch in a process if there's nothing running and nothing actively switching in '''
     def handle_switch_in_fcfs(self,event,print_event):
-        if len(self.ready_queue) > 0 and not self.active:
+        if len(self.ready_queue) > 0 and not self.active and not self.switching:
+            self.switching = True
             self.ready_queue[0].add_wait(event.get_t())
             if self.ready_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
@@ -57,29 +55,27 @@ class ReadyQueue:
             # queue a cpu_start at time t+t_cs/2. 
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "cpu_start", p, self.t_cs))
 
-    # switch out is reflected at the end of t+t_cs/2. we only add back to the ready queue if theres more than one 
-    # burst remaining.
+    ''' switch out is reflected at the end of t+t_cs/2. we only add back to the ready queue if theres more than one 
+     burst remaining. '''
     def handle_switch_out_fcfs(self,event,print_event):
         if len(event.get_process().get_bursts()) > 0:
             self.ready_queue.append(event.get_process())
-        self.active=None
+        self.switching = False
 
-    # same as a switchout except don't add to the ready queue
-    # this function is used to switch out the active state at the desired time stamp
+    ''' switch active state to the io state '''
     def io_active_switchout_fcfs(self,event,print_event):
-        self.active=None
+        self.switching = False
 
-    # io_switch_out is responsible for moving the active process to the io state.
-    # switch_out_io is scheduled for t + t_cs/2 to account for the switchout, and 
-    # we schedule a switch-in if there are processes in the ready queue.
-    # switch-in happens at t+t_cs/2, and switch-in schedules cpu_start at t+t_cs/2 to account for a full context switch
+    ''' switch the active state out, and bring the next process in if possible'''
     def handle_io_switch_out_fcfs(self,event,print_event):
         self.io_state = self.active
-        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.active, self.t_cs))
+        self.active = None # active is no longer running/completing bursts
+        self.switching = True
+        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.io_state, self.t_cs))
         if len(self.ready_queue) > 0:
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_in", self.ready_queue[0], self.t_cs))
 
-    # driver function, basically queue arrival events and then loop through the priority queue until done
+    ''' driver function: execute each event in the queue until it's empty '''
     def fcfs(self):
         print(f"time 0ms: Simulator started for FCFS {self.to_str_fcfs()}")
         self.event_queue = [Event(p.get_arrival_time(), "arrival", p, self.t_cs) for p in self.processes]
@@ -90,7 +86,7 @@ class ReadyQueue:
             self.execute_event_fcfs(heapq.heappop(self.event_queue))
 
     def execute_event_fcfs(self, event):
-        # print event isnt used yet, but we only need to print things before 10000ms (mostly)
+        # print event isnt used yet, but we only need to print things before 10000ms
         print_event = event.get_t() < 10000
         if event.type == "arrival":
             self.handle_arrival_fcfs(event,print_event)
@@ -98,7 +94,6 @@ class ReadyQueue:
             self.handle_switch_in_fcfs(event,print_event)
         elif event.type == "switch_out":
             self.handle_switch_out_fcfs(event,print_event)
-        # bad naming but io_switch will call a switch_out_io (i can fix this at some point for clarity)
         elif event.type == "io_switch":
             self.handle_io_switch_out_fcfs(event,print_event)
         elif event.type == "switch_out_io":
@@ -116,8 +111,7 @@ class ReadyQueue:
             self.termination = event.get_t()
             self.compute_simout()
 
-    # on arrival, add the process to the ready queue and switch in a new process if 
-    # nothing is using the cpu currently.
+    ''' add process to the ready queue, and attempt to move into the running state '''
     def handle_arrival_fcfs(self,event,print_event):
         self.ready_queue.append(event.get_process())
         
@@ -126,17 +120,18 @@ class ReadyQueue:
         event.get_process().set_burst_arrival(event.get_t())
         
         print(f"{event} {self.to_str_fcfs()}")
-        if not self.active:
+        if not self.active and not self.switching:
             # add to the active state in t_cs/2 ms, but remove from ready queue immediately
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in",event.get_process(),self.t_cs))
     
-    # queue a cpu end for the active process. ** this assumes no preemptions **
+    ''' queue cpu ending event '''
     def handle_cpu_start_fcfs(self,event,print_event):
         print(f"{event} {self.to_str_fcfs()}")
+        self.switching = False
         # self.active is a process, which stores bursts as [[cpu_burst,io_burst]...,[cpu_burst]]
         heapq.heappush(self.event_queue,Event(event.get_t()+self.active.get_bursts()[0][0],"cpu_end",self.active, self.t_cs))
 
-    # cpu end: queue io event if if has one, otherwise switch out completely for the next process
+    ''' end: queue io event if if has one, otherwise switch out completely for the next process '''
     def handle_cpu_end_fcfs(self,event,print_event):
         event.get_process().compute_turnaround(event.get_t()+int(self.t_cs/2))
 
@@ -151,24 +146,25 @@ class ReadyQueue:
         print(f"{event} {self.to_str_fcfs()}")
         event.get_process().complete_burst()
 
+        active = self.active
+        self.active = None
+        self.switching = True
         # switch out actually happens at t+t_cs/2, switch in happens at t+t_cs/2 but waits t_cs/2 for cpu_start
-        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", active, self.t_cs))
         if len(self.ready_queue) > 0:
             heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.ready_queue[0], self.t_cs))
         # only the switch out remains on the queue, otherwise done
-        # this probably changes for preemptive algos
         elif len(self.ready_queue) == 0 and len(self.event_queue) == 1: 
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2),"terminate",None,self.t_cs))
 
-    # when blocking on io, schedule an event to move the active process to io state. io_switch handles context switch overhead
-    # queue io_end based on the io_burst time
+    ''' schedule a switch out from the active state, and schedule an i/o completion event '''
     def handle_io_block_fcfs(self,event,print_event):
         print(f"{event} {self.to_str_fcfs()}")
         p = event.get_process()
         heapq.heappush(self.event_queue, Event(event.get_t(),"io_switch",p,self.t_cs))
         heapq.heappush(self.event_queue, Event(event.get_t()+p.get_bursts()[0][1]+int(self.t_cs/2), "io_end", p, self.t_cs))
 
-    #  io completes -> add to queue -> check empty space
+    ''' io completes -> add to queue -> switch in if possible '''  
     def handle_io_end_fcfs(self,event,print_event):
         event.get_process().complete_burst()
         event.get_process().begin_wait(event.get_t())
@@ -178,7 +174,7 @@ class ReadyQueue:
         print(f"{event} {self.to_str_fcfs()}")
         self.io_state = None
         # attempt to switch in if nothing is using the cpu and nothing is already trying to switch in 
-        if not self.active and len(self.ready_queue) == 1:
+        if not self.active and not self.switching:
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in", self.ready_queue[0], self.t_cs))
 
 # --------------------------------------------------------------------------------------------------------------------------------------
@@ -187,12 +183,12 @@ class ReadyQueue:
 
     # switch in happens at t but stalls t_cs/2 ms before beginning cpu_start
     def handle_switch_in_sjf(self,event,print_event):
-        if len(self.sjf_queue) > 0 and not self.active:
+        if len(self.sjf_queue) > 0 and not self.active and not self.switching:
+            self.switching = True
             self.sjf_queue[0].add_wait(event.get_t())
             if self.sjf_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
             p = self.sjf_queue[0]
-            self.active = p
             heapq.heappop(self.sjf_queue)
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "cpu_start", p, self.t_cs))
 
@@ -200,17 +196,19 @@ class ReadyQueue:
     def handle_switch_out_sjf(self,event,print_event):
         if len(event.get_process().get_bursts()) > 0:
             heapq.heappush(self.sjf_queue,event.get_process())
-        self.active=None
+        self.switching = False
 
     def handle_io_switch_out_sjf(self,event,print_event):
         self.io_state = self.active
-        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.active, self.t_cs))
+        self.active = None
+        self.switching = True
+        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.io_state, self.t_cs))
 
         if len(self.sjf_queue) > 0:
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_in", self.sjf_queue[0], self.t_cs))
     
     def io_active_switchout_sjf(self,event,print_event):
-        self.active=None
+        self.switching = False
 
     def sjf(self):
         print(f"time 0ms: Simulator started for SJF {self.to_str_sjf()}")
@@ -256,11 +254,13 @@ class ReadyQueue:
 
         print(f"{event} {self.to_str_sjf()}")
 
-        if not self.active:
+        if not self.active and not self.switching:
             # add it to the active state in t_cs/2 ms, but remove from ready queue immediately
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in",event.get_process(),self.t_cs))
     
     def handle_cpu_start_sjf(self,event,print_event):
+        self.switching = False
+        self.active = event.get_process()
         print(f"{event} {self.to_str_sjf()}")
         heapq.heappush(self.event_queue,Event(event.get_t()+self.active.get_bursts()[0][0],"cpu_end",self.active, self.t_cs))
 
@@ -278,8 +278,11 @@ class ReadyQueue:
         # pop final cpu burst & append final wait time
         event.get_process().complete_burst()
         
+        active = self.active
+        self.active = None
+        self.switching = True
         # switch out actually happens at t+t_cs/2, switch in happens at t+t_cs/2 but waits t_cs/2 for cpu_start
-        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", active, self.t_cs))
         if len(self.sjf_queue) > 0:
             heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.sjf_queue[0], self.t_cs))
         elif len(self.ready_queue) == 0 and len(self.event_queue) == 1: # only the switch out remains on the queue
@@ -299,7 +302,7 @@ class ReadyQueue:
         heapq.heappush(self.sjf_queue, event.get_process())
         print(f"{event} {self.to_str_sjf()}")
         self.io_state = None
-        if not self.active and len(self.sjf_queue) == 1:
+        if not self.active and not self.switching:
             heapq.heappush(self.event_queue, Event(event.get_t(), "switch_in", self.sjf_queue[0], self.t_cs))
 
     def handle_tau_recalc(self, event, print_event):
@@ -311,24 +314,22 @@ class ReadyQueue:
 # --------------------------------------------------------------------------------------------------------------------------------------
 
     def preempt_srt(self, event, print_event):
-        # p = self.sjf_queue[0]
-        # remaining = self.active.calc_remaining_tau(event.get_t())
-        # self.active.set_remaining_tau(remaining)
-        # self.active.partial_burst(event.get_t()-self.active.cpu_start)
-        # print(f"remaining on the top burst during preempt: {self.active.bursts[0][0]}")
+        self.switching=True
+        p = self.active
+        self.active = None
         # switch out
-        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", p, self.t_cs))
         # switch in 
         heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.sjf_queue[0], self.t_cs))
 
     # switch in happens at t but stalls t_cs/2 ms before beginning cpu_start
     def handle_switch_in_srt(self,event,print_event):
-        if len(self.sjf_queue) > 0 and not self.active:
+        if len(self.sjf_queue) > 0 and not self.active and not self.switching:
+            self.switching = True
             self.sjf_queue[0].add_wait(event.get_t())
             if self.sjf_queue[0].get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
             p = self.sjf_queue[0]
-            self.active = p
             heapq.heappop(self.sjf_queue)
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "cpu_start", p, self.t_cs))
 
@@ -336,18 +337,20 @@ class ReadyQueue:
     def handle_switch_out_srt(self,event,print_event):
         if len(event.get_process().get_bursts()) > 0:
             heapq.heappush(self.sjf_queue,event.get_process())
-        self.active=None
+        self.switching = False
 
     def handle_io_switch_out_srt(self,event,print_event):
         self.io_state = self.active
+        self.active = None
+        self.switching = True
         heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.active, self.t_cs))
-
+        
         if len(self.sjf_queue) > 0:
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_in", self.sjf_queue[0], self.t_cs))
     
     def io_active_switchout_srt(self,event,print_event):
-        self.active=None
-
+        self.switching = False
+    
     def srt(self):
         print(f"time 0ms: Simulator started for SRT {self.to_str_sjf()}")
         self.event_queue = [Event(p.get_arrival_time(), "arrival", p, self.t_cs) for p in self.processes]
@@ -365,10 +368,10 @@ class ReadyQueue:
             self.handle_switch_in_srt(event,print_event)
         elif event.type == "switch_out":
             self.handle_switch_out_srt(event,print_event)
-        elif event.type == "switch_out_io":
-            self.io_active_switchout_srt(event,print_event)
         elif event.type == "io_switch":
             self.handle_io_switch_out_srt(event,print_event)
+        elif event.type == "switch_out_io":
+            self.io_active_switchout_srt(event,print_event)
         elif event.type == "cpu_start":
             self.handle_cpu_start_srt(event,print_event)
         elif event.type == "cpu_end": 
@@ -404,9 +407,17 @@ class ReadyQueue:
     
     ''' we don't know when the cpu end will happen, so this will change'''
     def handle_cpu_start_srt(self,event,print_event):
+        self.switching = False
         print(f"{event} {self.to_str_sjf()}")
+        self.active = event.get_process()
         self.active.set_cpu_start(event.get_t())
-        heapq.heappush(self.event_queue,Event(event.get_t()+self.active.get_bursts()[0][0],"cpu_end",self.active, self.t_cs))
+        # this will only happen from context switch timings, otherwise arrival/io switch in handles this
+        if len(self.sjf_queue) > 0 and self.sjf_queue[0].get_remaining_tau() < event.get_process().get_remaining_tau():
+            print(f"time {event.get_t()}ms: Process {self.sjf_queue[0].get_pid()} (tau {self.sjf_queue[0].get_tau()}ms) will preempt \
+{event.get_process().get_pid()} {self.to_str_sjf()}")
+            heapq.heappush(self.event_queue, Event(event.get_t(),"preempt",self.active,self.t_cs))
+        else:
+            heapq.heappush(self.event_queue,Event(event.get_t()+self.active.get_bursts()[0][0],"cpu_end",self.active, self.t_cs))
 
     '''
     cpu end: 
@@ -417,26 +428,28 @@ class ReadyQueue:
     '''
     def handle_cpu_end_srt(self,event,print_event):
         p = event.get_process()
-        if p.get_pid() == self.active.get_pid():
-            # print(f"time {event.get_t()}ms: remaining time: {p.bursts[0][0]}-({event.get_t()}-{p.cpu_start})")
+        if self.active and p.get_pid() == self.active.get_pid():
             p.partial_burst(event.get_t()-p.cpu_start)
             # partial_burst updates the top burst time, so we have to adjust cpu_start
+            p.set_remaining_tau(p.calc_remaining_tau(event.get_t()))
             p.set_cpu_start(event.get_t())
+
             # burst completed, more to complete
             if p.bursts[0][0] == 0 and len(event.process.get_bursts())-1 > 0:
                 print(f"{event} {self.to_str_sjf()}")
                 heapq.heappush(self.event_queue,Event(event.get_t(), "tau_recalc", self.active, self.t_cs))
                 heapq.heappush(self.event_queue,Event(event.get_t(), "io_block", self.active, self.t_cs))                
+            
             # burst completed, no more to complete
-            # switch out & switch next in, or terminate
             elif p.bursts[0][0] == 0:
                 print(f"{event} {self.to_str_sjf()}")
-
                 # pop final cpu burst & append final wait time
                 p.complete_burst()
-        
+                self.switching=True
+                active = self.active
+                self.active = None
                 # switch out actually happens at t+t_cs/2, switch in happens at t+t_cs/2 but waits t_cs/2 for cpu_start
-                heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+                heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", active, self.t_cs))
                 if len(self.sjf_queue) > 0:
                     heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.sjf_queue[0], self.t_cs))
                 elif len(self.ready_queue) == 0 and len(self.event_queue) == 1: # only the switch out remains on the queue
@@ -462,7 +475,7 @@ class ReadyQueue:
         p.complete_burst()
         heapq.heappush(self.sjf_queue, event.get_process())
         self.io_state = None  
-        if self.active: 
+        if self.active and not self.switching: 
             remaining = self.active.calc_remaining_tau(event.get_t())
             # print(f"time {event.get_t()}ms: predicted remaining time: {remaining}")
             if p.get_tau() < remaining: 
@@ -473,7 +486,7 @@ class ReadyQueue:
                 heapq.heappush(self.event_queue, Event(event.get_t(), "preempt", self.active, self.t_cs))
                 return
         print(f"{event} {self.to_str_sjf()}")
-        if not self.active and len(self.sjf_queue) == 1:
+        if not self.active:
             heapq.heappush(self.event_queue, Event(event.get_t(), "switch_in", self.sjf_queue[0], self.t_cs))
 
     def handle_tau_recalc_srt(self, event, print_event):
@@ -494,9 +507,11 @@ class ReadyQueue:
 {self.to_str_fcfs()}")
             # update top burst
             self.active.begin_wait(event.get_t()+int(self.t_cs/2))
-
+            active = self.active
+            self.active = None
+            self.switching = True
             # switch out
-            heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+            heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", active, self.t_cs))
             # switch in 
             heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.ready_queue[0], self.t_cs))
         else:
@@ -512,15 +527,14 @@ class ReadyQueue:
 
     # switch in happens at t but stalls t_cs/2 ms before beginning cpu_start
     def handle_switch_in_rr(self,event,print_event):
-        if len(self.ready_queue) > 0 and not self.active:
-            self.ready_queue[0].add_wait(event.get_t())
+        if len(self.ready_queue) > 0 and not self.active and not self.switching:
+            self.switching = True
+            p = self.ready_queue[0]
+            p.add_wait(event.get_t())
             if event.get_process().get_type() == "CPU-bound": self.cpu_context+=1
             else: self.io_context+=1
-            p = self.ready_queue[0]
-            self.active = p
+            
             self.ready_queue.pop(0)
-            # print(f"time {event.get_t()}: switch in occurred, {self.active.get_pid()} {self.to_str_fcfs()}")
-
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "cpu_start", p, self.t_cs))
 
     # switch out is reflected at the end of t+t_cs/2
@@ -528,16 +542,18 @@ class ReadyQueue:
         # add to ready queue if theres remaining cpu burst time, or more bursts in the future
         if len(event.get_process().get_bursts()) > 0:
             self.ready_queue.append(event.get_process())
-        self.active=None
+        self.switching = False
         # print(f"time {event.get_t()}ms: switch out occurred, {self.to_str_fcfs()}")
 
     # same as a switchout except don't add to the ready queue
     def io_active_switchout_rr(self,event,print_event):
-        self.active=None
+        self.switching=False
 
     def handle_io_switch_out_rr(self,event,print_event):
         self.io_state = self.active
-        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.active, self.t_cs))
+        self.active = None
+        self.switching = True
+        heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_out_io", self.io_state, self.t_cs))
         if len(self.ready_queue) > 0:
             heapq.heappush(self.event_queue,Event(event.get_t()+int(self.t_cs/2), "switch_in", self.ready_queue[0], self.t_cs))
 
@@ -583,13 +599,15 @@ class ReadyQueue:
         event.get_process().begin_wait(event.get_t())
         event.get_process().set_burst_arrival(event.get_t())
         print(f"{event} {self.to_str_fcfs()}")
-        if not self.active:
+        if not self.active and not self.switching:
             # add it to the active state in t_cs/2 ms, but remove from ready queue immediately
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in",event.get_process(),self.t_cs))
     
     # this changes. we don't know when the cpu will end
     def handle_cpu_start_rr(self,event,print_event):
         print(f"{event} {self.to_str_fcfs()}")
+        self.active = event.get_process()
+        self.switching = False
         burst_time = self.active.get_bursts()[0][0]
         if burst_time > self.t_slice:
             # queue preempt
@@ -611,8 +629,11 @@ class ReadyQueue:
 
         event.get_process().complete_burst()
 
+        active = self.active
+        self.active = None
+        self.switching = True
         # switch out actually happens at t+t_cs/2, switch in happens at t+t_cs/2 but waits t_cs/2 for cpu_start
-        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", self.active, self.t_cs))
+        heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_out", active, self.t_cs))
         if len(self.ready_queue) > 0:
             heapq.heappush(self.event_queue, Event(event.get_t()+int(self.t_cs/2),"switch_in", self.ready_queue[0], self.t_cs))
         elif len(self.ready_queue) == 0 and len(self.event_queue) == 1: # only the switch out remains on the queue
@@ -634,7 +655,7 @@ class ReadyQueue:
         print(f"{event} {self.to_str_fcfs()}")
         self.io_state = None
         # attempt to switch in if nothing is already trying to switch in 
-        if not self.active and len(self.ready_queue) == 1:
+        if not self.active and not self.switching:
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in", self.ready_queue[0], self.t_cs))
 
     def ceil_help(self, val):
@@ -697,7 +718,7 @@ class ReadyQueue:
         io_pct = self.ceil_help(100*io_bound_ts/io_bursts) if io_bursts > 0 else 0
         overall_pct = self.ceil_help(100*(cpu_bound_ts+io_bound_ts)/all_bursts) if all_bursts > 0 else 0
         print("-- CPU-bound percentage of CPU bursts completed within one time slice: {:.3f}%".format(cpu_pct))
-        print("-- CPU-bound percentage of CPU bursts completed within one time slice:  {:.3f}%".format(io_pct))
+        print("-- CPU-bound percentage of CPU bursts completed within one time slice: {:.3f}%".format(io_pct))
         print("-- overall percentage of CPU bursts completed within one time slice: {:.3f}%".format(overall_pct))
 
                 
