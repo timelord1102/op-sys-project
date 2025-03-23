@@ -611,7 +611,7 @@ class ReadyQueue:
         elif event.type == "preempt":
             self.preempt(event,print_event)
         elif event.type == "terminate":
-            print(f"time {event.get_t()}ms: Simulator ended for RR [Q empty]")
+            print(f"time {event.get_t()}ms: Simulator ended for RR [Q empty]",end="")
             self.termination = event.get_t()
 
     def handle_arrival_rr(self,event,print_event):
