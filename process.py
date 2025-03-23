@@ -131,5 +131,4 @@ class Process:
                 s += f"==> CPU burst {b[0]}ms ==> I/O burst {b[1]}ms\n"
             else:
                 s += f"==> CPU burst {b[0]}ms\n"
-        s += f"tau: {self.tau}\n"
         return s

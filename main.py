@@ -1,6 +1,6 @@
 from process import Process
 from readyqueue import ReadyQueue
-from event import Event
+import copy
 import sys
 import math
 
@@ -82,6 +82,50 @@ def create_io_process(n, process_names, upper, l, alpha):
                                  process_type="I/O-bound", alpha=alpha, tau=tau))
     return processes
 
+def ceil_help(val):
+    return math.ceil(val * 1000) / 1000
+
+def get_process_stats(processes):
+    num_cpu = num_io = cpu_bound_cpu = io_bound_cpu = cpu_bound_io = io_bound_io = 0
+    cpu_bound_cpu_bursts = cpu_bound_io_bursts = io_bound_cpu_bursts = io_bound_io_bursts = 0
+    numprocesses = len(processes)
+    for p in processes:
+        if p.get_type() == "CPU-bound":
+            num_cpu+=1
+            cpu_bound_cpu_bursts += len(p.get_bursts())
+            cpu_bound_io_bursts += len(p.get_bursts())-1
+            for burst in p.get_bursts():
+                cpu_bound_cpu += burst[0]
+                if len(burst) > 1:
+                    cpu_bound_io += burst[1]
+        else:
+            num_io+=1
+            io_bound_cpu_bursts += len(p.get_bursts())
+            io_bound_io_bursts += len(p.get_bursts())-1
+            for burst in p.get_bursts():
+                io_bound_cpu += burst[0]
+                if len(burst) > 1:
+                    io_bound_io += burst[1]
+    cpu_bound_avg_cpu = ceil_help(cpu_bound_cpu/cpu_bound_cpu_bursts) if cpu_bound_cpu_bursts > 0 else 0
+    io_bound_avg_cpu = ceil_help(io_bound_cpu/io_bound_cpu_bursts) if io_bound_cpu_bursts > 0 else 0
+    overall_cpu = ceil_help((cpu_bound_cpu + io_bound_cpu) / 
+                            (cpu_bound_cpu_bursts + io_bound_cpu_bursts)) if (cpu_bound_cpu_bursts + io_bound_cpu_bursts) > 0 else 0
+    cpu_bound_avg_io = ceil_help(cpu_bound_io/cpu_bound_io_bursts) if cpu_bound_cpu_bursts > 0 else 0 
+    io_bound_avg_io = ceil_help(io_bound_io/io_bound_io_bursts) if cpu_bound_cpu_bursts > 0 else 0
+    overall_io = ceil_help((cpu_bound_io + io_bound_io) / 
+                            (cpu_bound_io_bursts + io_bound_io_bursts)) if (cpu_bound_io_bursts + io_bound_io_bursts) > 0 else 0
+    res = f"-- number of processes: {numprocesses}\n"
+    res += f"-- number of CPU-bound processes: {num_cpu}\n"
+    res += f"-- number of I/O-bound processes: {num_io}\n"
+    res += "-- CPU-bound average CPU burst time: {:.3f} ms\n".format(cpu_bound_avg_cpu)
+    res += "-- I/O-bound average CPU burst time: {:.3f} ms\n".format(io_bound_avg_cpu)
+    res += "-- overall average CPU burst time: {:.3f} ms\n".format(overall_cpu)
+    res += "-- CPU-bound average I/O burst time: {:.3f} ms\n".format(cpu_bound_avg_io)
+    res += "-- I/O-bound average I/O burst time: {:.3f} ms\n".format(io_bound_avg_io)
+    res += "-- overall average I/O burst time: {:.3f} ms\n\n".format(overall_io)
+    return res
+    
+
 if __name__ == "__main__":
 
     if len(sys.argv) != 9:
@@ -97,12 +141,12 @@ if __name__ == "__main__":
     alpha = float(sys.argv[7])
     t_slice = int(sys.argv[8])
     
-    # if (n_cpu == 1):
-    #     print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound process")
-    # else:
-    #     print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound processes")
-    # print(f"<<< -- seed={seed}; lambda={l:.6f}; bound={upper}")
-    # print()
+    if (n_cpu == 1):
+        print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound process")
+    else:
+        print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound processes")
+    print(f"<<< -- seed={seed}; lambda={l:.6f}; bound={upper}")
+    print()
 
     srand48( seed )
 
@@ -116,14 +160,34 @@ if __name__ == "__main__":
             processes.append(f"{a}{i}")
 
     
-    ''' beware of aliasing '''
-    l = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
+    ''' this is really inefficient but we don't have any reset functionality '''
+    processes_fcfs = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
+    processes_sjf = copy.deepcopy(processes_fcfs)
+    processes_srt = copy.deepcopy(processes_fcfs)
+    processes_rr = copy.deepcopy(processes_fcfs)
+    simout = get_process_stats(processes_fcfs)
+    
+    for p in processes_fcfs:
+        print(p)
+    q_fcfs = ReadyQueue(processes_fcfs, t_cs)
+    q_sjf = ReadyQueue(processes_sjf, t_cs)
+    q_srt = ReadyQueue(processes_srt, t_cs)
+    q_rr = ReadyQueue(processes_rr, t_cs)
+    print("<<< PROJECT SIMULATIONS")
+    print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
+ 
+    q_fcfs.fcfs()
+    simout += "Algorithm FCFS\n"
+    simout += q_fcfs.compute_simout() + "\n"
+    q_sjf.sjf()
+    simout += "Algorithm SJF\n"
+    simout += q_sjf.compute_simout() + "\n"
+    q_srt.srt()
+    simout += "Algorithm SRT\n"
+    simout += q_srt.compute_simout() + "\n"
+    q_rr.rr(t_slice)
+    simout += "Algorithm RR\n"
+    simout += q_rr.compute_simout_rr()
+    with open("simout.txt","w") as f:
+        f.write(simout)
 
-    # for p in l:
-    #     print(p)
-    q = ReadyQueue(l, t_cs)
-    # print("<<< PROJECT SIMULATIONS")
-    # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    # q.rr(t_slice)
-    q.srt()
-    # q.fcfs()
