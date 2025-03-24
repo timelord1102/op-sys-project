@@ -119,9 +119,21 @@ if __name__ == "__main__":
     ''' beware of aliasing '''
     l = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
 
+    # processb = Process(pid="A1", arrival_time=10, bursts=[[i * 10,i*4] for i in range(1,2)], process_type="CPU-bound",alpha=alpha,tau=10)
+
+    # processa = Process(pid="A0", arrival_time=11, bursts=[[i * 10,i*4] for i in range(1,2)], process_type="CPU-bound",alpha=alpha,tau=5)
+    # processc = Process(pid="A2",arrival_time=20,bursts=[[5,12],[5]],process_type="CPU-bound",alpha=alpha,tau=5)
+    # processb.bursts.append([5])
+    # processa.bursts.append([5])
+    # processb.original_bursts.append([5])
+    # processa.original_bursts.append([5])
+    # print(processa.tau,processb.tau)
+    # l = [processa,processb,processc]
     # for p in l:
     #     print(p)
     q = ReadyQueue(l, t_cs)
     # print("<<< PROJECT SIMULATIONS")
     # print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
-    q.sjf()
+    q.rr(10000000000)
+    # q.srt()
+    # q.fcfs()
