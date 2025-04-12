@@ -75,6 +75,8 @@ class Event:
             return f"t: {self.t}, type: {self.type}, pid: {self.process.get_pid()}"
 
     def to_str_tau(self):
+        if (self.process.alpha == -1):
+            return self.to_str()
         if self.type == "arrival":
             return f"time {self.t}ms: Process {self.process.get_pid()} (tau {self.process.get_tau()}ms) arrived; added to ready queue"
         elif self.type == "cpu_start":

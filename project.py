@@ -38,14 +38,14 @@ def drand48() -> float:
     return Xi / (2**48)
 
 def next_exp(upper_bound,lambda_val):
-    
+
     r = drand48()
 
     x = -math.log( r ) / lambda_val
-    while (x > upper_bound):
+    while (math.ceil(x) > upper_bound):
         r = drand48()
         x = -math.log( r ) / lambda_val
-    
+
     return x
 
 def create_cpu_process(n, process_names, upper, l, alpha):
@@ -55,10 +55,10 @@ def create_cpu_process(n, process_names, upper, l, alpha):
         num_bursts = math.ceil(drand48() * 32)
         bursts = []
         for j in range(0, num_bursts-1):
-            cpu_burst = math.ceil(next_exp(upper,l)) * 4 
+            cpu_burst = math.ceil(next_exp(upper,l)) * 4
             io_burst = math.ceil(next_exp(upper,l))
             bursts.append([cpu_burst,io_burst])
-        cpu_burst = math.ceil(next_exp(upper,l)) * 4 
+        cpu_burst = math.ceil(next_exp(upper,l)) * 4
         bursts.append([cpu_burst])
         tau = math.ceil(1/l)
         processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts,
@@ -72,13 +72,13 @@ def create_io_process(n, process_names, upper, l, alpha):
         num_bursts = math.ceil(drand48() * 32)
         bursts = []
         for j in range(0, num_bursts-1):
-            cpu_burst = math.ceil(next_exp(upper,l)) 
+            cpu_burst = math.ceil(next_exp(upper,l))
             io_burst = math.ceil(next_exp(upper,l)) * 8
             bursts.append([cpu_burst,io_burst])
-        cpu_burst = math.ceil(next_exp(upper,l)) 
+        cpu_burst = math.ceil(next_exp(upper,l))
         bursts.append([cpu_burst])
         tau = math.ceil(1/l)
-        processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts, 
+        processes.append(Process(pid=process_names[i], arrival_time=p_arrival, bursts=bursts,
                                  process_type="I/O-bound", alpha=alpha, tau=tau))
     return processes
 
@@ -109,12 +109,14 @@ def get_process_stats(processes):
                 io_bound_cpu += burst[0]
                 if len(burst) > 1:
                     io_bound_io += burst[1]
+
     cpu_bound_avg_cpu = ceil_help(cpu_bound_cpu,cpu_bound_cpu_bursts)
     io_bound_avg_cpu = ceil_help(io_bound_cpu,io_bound_cpu_bursts)
     overall_cpu = ceil_help((cpu_bound_cpu + io_bound_cpu),(cpu_bound_cpu_bursts + io_bound_cpu_bursts))
-    cpu_bound_avg_io = ceil_help(cpu_bound_io,cpu_bound_io_bursts) 
+    cpu_bound_avg_io = ceil_help(cpu_bound_io,cpu_bound_io_bursts)
     io_bound_avg_io = ceil_help(io_bound_io,io_bound_io_bursts)
     overall_io = ceil_help((cpu_bound_io + io_bound_io),(cpu_bound_io_bursts + io_bound_io_bursts))
+
     res = f"-- number of processes: {numprocesses}\n"
     res += f"-- number of CPU-bound processes: {num_cpu}\n"
     res += f"-- number of I/O-bound processes: {num_io}\n"
@@ -125,23 +127,46 @@ def get_process_stats(processes):
     res += "-- I/O-bound average I/O burst time: {:.3f} ms\n".format(io_bound_avg_io)
     res += "-- overall average I/O burst time: {:.3f} ms\n\n".format(overall_io)
     return res
-    
+
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 9:
-        print("ERROR: invalid arguments")
-        exit()
 
+    if not sys.argv[1].isdigit() or int(sys.argv[1]) <= 0:
+        print("ERROR: first argument must be a positive integer")
+        exit()
     n = int(sys.argv[1])
+    if not sys.argv[2].isdigit() or int(sys.argv[2]) < 0 or n < int(sys.argv[2]):
+        print("ERROR: second argument must be a positive integer")
+        exit()
     n_cpu = int(sys.argv[2])
+    if not sys.argv[3].isdigit() or int(sys.argv[3]) <= 0:
+        print("ERROR: third argument must be a positive integer")
+        exit()
     seed = int(sys.argv[3])
+    if not sys.argv[4].replace('.','',1).isdigit() or float(sys.argv[4]) <= 0:
+        print("ERROR: fourth argument must be a positive float")
+        exit()
     l = float(sys.argv[4])
+    if not sys.argv[5].isdigit() or int(sys.argv[5]) <= 0 :
+        print("ERROR: fifth argument must be a positive integer")
+        exit()
     upper = int(sys.argv[5])
+    if not sys.argv[6].isdigit() or int(sys.argv[6]) <= 0:
+        print("ERROR: sixth argument must be a positive integer")
+        exit()
     t_cs = int(sys.argv[6])
-    alpha = float(sys.argv[7])
-    t_slice = int(sys.argv[8])
     
+    alpha = float(sys.argv[7])
+    if not sys.argv[8].isdigit() or int(sys.argv[8]) <= 0:
+        print("ERROR: eighth argument must be a positive integer")
+        exit()
+    t_slice = int(sys.argv[8])
+
+    rr_alt = False
+    if (len(sys.argv)) == 10: 
+        rr_alt = True
+
     if (n_cpu == 1):
         print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound process")
     else:
@@ -154,29 +179,34 @@ if __name__ == "__main__":
     alphabet = []
     for i in range(26):
         alphabet.append(chr(i+65))
-    
+
     processes = []
-    for a in alphabet: 
+    for a in alphabet:
         for i in range(10):
             processes.append(f"{a}{i}")
 
-    
+
     ''' this is really inefficient but we don't have any reset functionality '''
     processes_fcfs = create_cpu_process(n_cpu,processes[0:n_cpu],upper,l,alpha) + create_io_process(n-n_cpu,processes[n_cpu:],upper,l,alpha)
     processes_sjf = copy.deepcopy(processes_fcfs)
     processes_srt = copy.deepcopy(processes_fcfs)
     processes_rr = copy.deepcopy(processes_fcfs)
     simout = get_process_stats(processes_fcfs)
-    
+
     for p in processes_fcfs:
         print(p)
     q_fcfs = ReadyQueue(processes_fcfs, t_cs)
     q_sjf = ReadyQueue(processes_sjf, t_cs)
     q_srt = ReadyQueue(processes_srt, t_cs)
     q_rr = ReadyQueue(processes_rr, t_cs)
+
+    alpha_str = str(alpha) if alpha > 0 else "<n/a>"
     print("<<< PROJECT SIMULATIONS")
-    print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
- 
+    if rr_alt:
+        print(f"<<< -- t_cs={t_cs}ms; alpha={alpha_str}; t_slice={t_slice}ms; RR_ALT")
+    else:
+        print(f"<<< -- t_cs={t_cs}ms; alpha={alpha_str}; t_slice={t_slice}ms")
+
     q_fcfs.fcfs()
     simout += "Algorithm FCFS\n"
     simout += q_fcfs.compute_simout() + "\n"
@@ -186,9 +216,8 @@ if __name__ == "__main__":
     q_srt.srt()
     simout += "Algorithm SRT\n"
     simout += q_srt.compute_simout() + "\n"
-    q_rr.rr(t_slice)
+    q_rr.rr(t_slice, rr_alt)
     simout += "Algorithm RR\n"
     simout += q_rr.compute_simout_rr()
     with open("simout.txt","w") as f:
         f.write(simout)
-

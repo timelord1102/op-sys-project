@@ -116,6 +116,10 @@ class Process:
         return self.original_bursts
 
     def __lt__(self,other):
+        if self.alpha == -1:
+            if self.bursts[0] != other.bursts[0]:
+                return self.bursts[0] < other.bursts[0]
+            return self.pid < other.pid
         if self.remaining_tau != other.remaining_tau:
             return self.remaining_tau < other.remaining_tau
         return self.pid < other.pid
