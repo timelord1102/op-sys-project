@@ -416,8 +416,8 @@ class ReadyQueue:
     ''' this will change, have to account for preemptions '''
     def handle_arrival_srt(self,event,print_event):
         heapq.heappush(self.sjf_queue, event.get_process())
-        if print_event:
-            print(f"{event.to_str_tau()} {self.to_str_sjf()}")
+        printed = False
+
 
         event.get_process().begin_wait(event.get_t())
         event.get_process().set_burst_arrival(event.get_t())
@@ -427,6 +427,9 @@ class ReadyQueue:
                 self.active.partial_burst(event.get_t()-self.active.cpu_start)
                 self.active.set_cpu_start(event.get_t())
                 if event.get_process() < self.active:
+                    if print_event:
+                        printed = True
+                        print(f"time {event.get_t()}ms: Process {event.get_process().get_pid()} arrived; preempting {self.active.get_pid()} {self.to_str_sjf()}")
                     heapq.heappush(self.event_queue, Event(event.get_t(),"preempt",self.active,self.t_cs))
             else:
                 remaining = self.active.calc_remaining_tau(event.get_t())
@@ -437,6 +440,9 @@ class ReadyQueue:
         else:
             # add it to the active state in t_cs/2 ms, but remove from ready queue immediately
             heapq.heappush(self.event_queue, Event(event.get_t(),"switch_in",event.get_process(),self.t_cs))
+        if not printed:
+            if print_event:
+                print(f"{event.to_str_tau()} {self.to_str_sjf()}")
 
     ''' we don't know when the cpu end will happen, so this will change'''
     def handle_cpu_start_srt(self,event,print_event):
@@ -447,7 +453,6 @@ class ReadyQueue:
         self.active.set_cpu_start(event.get_t())
         # this will only happen from context switch timings, otherwise arrival/io switch in handles this
         if self.active.alpha == -1 and len(self.sjf_queue) > 0 and self.sjf_queue[0] < self.active:
-                print(self.sjf_queue[0].bursts[0],self.active.bursts[0])
                 if print_event:
                     print(f"time {event.get_t()}ms: Process {self.sjf_queue[0].get_pid()} will preempt \
 {event.get_process().get_pid()} {self.to_str_sjf()}")
@@ -533,6 +538,9 @@ class ReadyQueue:
                         print(f"time {event.get_t()}ms: Process {p.get_pid()} completed I/O; preempting \
 {self.active.get_pid()} {self.to_str_sjf()}")  
                     heapq.heappush(self.event_queue, Event(event.get_t(),"preempt",self.active,self.t_cs))
+                else:
+                    if print_event:
+                        print(f"time {event.get_t()}ms: Process {p.get_pid()} completed I/O; added to ready queue {self.to_str_sjf()}")  
                 return
             remaining = self.active.calc_remaining_tau(event.get_t())
             # print(f"time {event.get_t()}ms: predicted remaining time: {remaining}")
