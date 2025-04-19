@@ -131,9 +131,6 @@ def get_process_stats(processes):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 9:
-        print("ERROR: invalid arguments")
-        exit()
 
     if not sys.argv[1].isdigit() or int(sys.argv[1]) <= 0:
         print("ERROR: first argument must be a positive integer")
@@ -159,14 +156,16 @@ if __name__ == "__main__":
         print("ERROR: sixth argument must be a positive integer")
         exit()
     t_cs = int(sys.argv[6])
-    if not sys.argv[7].replace('.','',1).isdigit() or float(sys.argv[7]) < 0 or float(sys.argv[7]) > 1:
-        print("ERROR: seventh argument must be a float between 0 and 1")
-        exit()
+    
     alpha = float(sys.argv[7])
     if not sys.argv[8].isdigit() or int(sys.argv[8]) <= 0:
         print("ERROR: eighth argument must be a positive integer")
         exit()
     t_slice = int(sys.argv[8])
+
+    rr_alt = False
+    if (len(sys.argv)) == 10: 
+        rr_alt = True
 
     if (n_cpu == 1):
         print(f"<<< -- process set (n={n}) with {n_cpu} CPU-bound process")
@@ -200,8 +199,13 @@ if __name__ == "__main__":
     q_sjf = ReadyQueue(processes_sjf, t_cs)
     q_srt = ReadyQueue(processes_srt, t_cs)
     q_rr = ReadyQueue(processes_rr, t_cs)
+
+    alpha_str = str(alpha) if alpha > 0 else "<n/a>"
     print("<<< PROJECT SIMULATIONS")
-    print(f"<<< -- t_cs={t_cs}ms; alpha={alpha}; t_slice={t_slice}ms")
+    if rr_alt:
+        print(f"<<< -- t_cs={t_cs}ms; alpha={alpha_str}; t_slice={t_slice}ms; RR_ALT")
+    else:
+        print(f"<<< -- t_cs={t_cs}ms; alpha={alpha_str}; t_slice={t_slice}ms")
 
     q_fcfs.fcfs()
     simout += "Algorithm FCFS\n"
@@ -212,7 +216,7 @@ if __name__ == "__main__":
     q_srt.srt()
     simout += "Algorithm SRT\n"
     simout += q_srt.compute_simout() + "\n"
-    q_rr.rr(t_slice)
+    q_rr.rr(t_slice, rr_alt)
     simout += "Algorithm RR\n"
     simout += q_rr.compute_simout_rr()
     with open("simout.txt","w") as f:
